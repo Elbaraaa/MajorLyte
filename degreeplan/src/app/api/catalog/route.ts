@@ -4,14 +4,14 @@ import { bulkInsertCourses } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
-    const formData    = await req.formData();
-    const file        = formData.get('file') as File | null;
+    const formData     = await req.formData();
+    const file         = formData.get('file') as File | null;
     const defaultMajor = (formData.get('defaultMajor') as string) || undefined;
 
     if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
 
-    const buffer   = Buffer.from(await file.arrayBuffer());
-    let rawText    = '';
+    const buffer = Buffer.from(await file.arrayBuffer());
+    let rawText  = '';
 
     if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
       const pdfParse = (await import('pdf-parse')).default;
@@ -25,10 +25,10 @@ export async function POST(req: NextRequest) {
     const courses  = await parseCatalogText(rawText, defaultMajor);
     if (!courses.length) return NextResponse.json({ error: 'No courses found in document' }, { status: 422 });
 
-    const inserted = bulkInsertCourses(courses);
+    const inserted = await bulkInsertCourses(courses);
     return NextResponse.json({ inserted, total: courses.length, courses });
   } catch (e: any) {
-    console.error('[/api/catalog]', e);
+    console.error('[POST /api/catalog]', e);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
