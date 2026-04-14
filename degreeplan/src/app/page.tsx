@@ -13,6 +13,8 @@ import {
 } from '@/components/Icons';
 
 export default function App() {
+  const [uploadingTranscript, setUploadingTranscript] = useState(false);
+  const transcriptFileRef = useRef<HTMLInputElement>(null);
   const [appMode, setAppMode]   = useState<'student' | 'advisor'>('student');
   const [advTab, setAdvTab]     = useState<'tools' | 'chatbot'>('tools');
   const [courses, setCourses]   = useState<Course[]>([]);
@@ -29,6 +31,33 @@ export default function App() {
 
   const sp = (k: string, v: any) => setProfile(p => ({ ...p, [k]: v }));
   const showToast = (title: string, desc: string, type: string) => setToast({ title, desc, type: type as any });
+
+  const handleTranscriptPdf = async (file: File) => {
+    setUploadingTranscript(true);
+    setError('');
+  
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+  
+      const res = await fetch('/api/transcript', {
+        method: 'POST',
+        body: fd,
+      });
+  
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Transcript upload failed');
+  
+      setTx(data.text || '');
+      showToast('Transcript uploaded!', 'PDF text was extracted successfully.', 'success');
+      setTxTab('paste');
+    } catch (e: any) {
+      setError(e.message);
+      showToast('Upload error', e.message, 'error');
+    } finally {
+      setUploadingTranscript(false);
+    }
+  };
 
   // Load courses from DB on mount
   useEffect(() => {
@@ -193,19 +222,61 @@ export default function App() {
                   <div className="card-header"><FileIcon /><span className="card-title">Transcript</span></div>
                   <div className="card-body">
                     <div className="tabs-list">
-                      <button className={`tab-btn ${txTab === 'paste' ? 'active' : ''}`} onClick={() => setTxTab('paste')}>Paste Text</button>
-                      <button className={`tab-btn ${txTab === 'upload' ? 'active' : ''}`} onClick={() => setTxTab('upload')}>Upload PDF</button>
+                      <button
+                        className={`tab-btn ${txTab === 'paste' ? 'active' : ''}`}
+                        onClick={() => setTxTab('paste')}
+                      >
+                        Paste Text
+                      </button>
+                      <button
+                        className={`tab-btn ${txTab === 'upload' ? 'active' : ''}`}
+                        onClick={() => setTxTab('upload')}
+                      >
+                        Upload PDF
+                      </button>
                     </div>
+
                     {txTab === 'paste' ? (
                       <>
-                        <textarea value={transcript} onChange={e => setTx(e.target.value)} placeholder="Paste your unofficial transcript text here…" />
-                        <button className="btn-sample" onClick={() => setTx(SAMPLE_TX)}><SparkIcon /> Load sample transcript</button>
+                        <textarea
+                          value={transcript}
+                          onChange={e => setTx(e.target.value)}
+                          placeholder="Paste your unofficial transcript text here…"
+                        />
+                        <button className="btn-sample" onClick={() => setTx(SAMPLE_TX)}>
+                          <SparkIcon /> Load sample transcript
+                        </button>
                       </>
                     ) : (
-                      <div style={{ textAlign: 'center', padding: '30px 0' }}>
+                      <div style={{ textAlign: 'center', padding: '24px 0' }}>
                         <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
-                        <p style={{ fontSize: 12, color: '#6b7280' }}>PDF transcript upload coming soon.</p>
-                        <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Use "Paste Text" tab for now.</p>
+                        <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
+                          Upload your unofficial transcript PDF and extract its text automatically.
+                        </p>
+
+                        <button
+                          className="btn-secondary"
+                          style={{ width: 'auto', margin: '0 auto' }}
+                          onClick={() => !uploadingTranscript && transcriptFileRef.current?.click()}
+                          disabled={uploadingTranscript}
+                        >
+                          {uploadingTranscript ? 'Extracting…' : 'Choose PDF'}
+                        </button>
+
+                        <input
+                          ref={transcriptFileRef}
+                          type="file"
+                          accept=".pdf,application/pdf"
+                          style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleTranscriptPdf(file);
+                          }}
+                        />
+
+                        <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 8 }}>
+                          After extraction, the text will be loaded into the transcript box automatically.
+                        </p>
                       </div>
                     )}
                   </div>
